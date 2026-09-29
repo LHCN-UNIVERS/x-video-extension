@@ -1,0 +1,35 @@
+.savenowx-download-btn {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: #ff3ea5;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 10px 12px;
+  cursor: pointer;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.25);
+  transition: background 0.12s ease;
+}
+
+.savenowx-download-btn:hover {
+  background: #ff5cb3;
+}
+
+.savenowx-download-btn:active {
+  background: #e0308f;
+}
+
+.savenowx-download-btn svg {
+  flex-shrink: 0;
+}

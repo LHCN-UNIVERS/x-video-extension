@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "SaveNowX — X/Twitter Video Downloader",
+  "short_name": "SaveNowX",
+  "version": "1.0.0",
+  "description": "Adds a one-click Download button to videos on X (Twitter). Free, no account, no watermark.",
+  "permissions": ["activeTab"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://x.com/*", "*://twitter.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://savenowx.com/*"],
+      "js": ["savenowx-detect.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "homepage_url": "https://savenowx.com"
+}
