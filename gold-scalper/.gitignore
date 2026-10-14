@@ -1,4 +1,5 @@
 ticks*.csv*
+bars_*.csv
 synthetic_ticks*
 trades*.csv
 bot.log

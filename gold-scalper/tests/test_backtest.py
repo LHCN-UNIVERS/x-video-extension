@@ -86,3 +86,38 @@ def test_signals_have_no_lookahead():
         for cut in (100, 250, 499):
             part = signals.compute(name, bars.iloc[:cut + 1])
             assert part.iloc[-1] == full.iloc[cut], name
+
+
+def test_trailing_stop_locks_in_profit(monkeypatch):
+    one_signal(monkeypatch, 1)
+    rows = [(0, 2650.0, 2650.3), (60, 2650.0, 2650.3),        # buy at ask 2650.30
+            (70, 2653.0, 2653.3),                             # best bid 2653 -> trail stop 2651
+            (80, 2651.5, 2651.8),                             # still above
+            (90, 2650.9, 2651.2)]                             # crosses 2651 -> exit at 2650.90
+    tr = run(rows, tp=0.0, sl=3.0, trail=2.0)
+    assert tr.reason[0] == "TRAIL"
+    assert tr.exit[0] == pytest.approx(2650.9)
+    assert tr.pnl[0] == pytest.approx(0.60)
+
+
+def test_no_tp_runs_until_time_limit(monkeypatch):
+    one_signal(monkeypatch, 1)
+    rows = [(0, 2650.0, 2650.3), (60, 2650.0, 2650.3), (90, 2660.0, 2660.3), (60 + 61, 2659.0, 2659.3)]
+    tr = run(rows, tp=0.0, max_hold_min=1)
+    assert tr.reason[0] == "TIME" and tr.exit[0] == pytest.approx(2659.0)
+
+
+def test_atr_filter_skips_quiet_market(monkeypatch):
+    one_signal(monkeypatch, 1, bar="2026-01-05 10:20:00")
+    rows = [(60 * k, 2650.0, 2650.3) for k in range(22)] + [(60 * 21 + 10, 2651, 2651.3)]
+    assert run(rows, min_atr_spread=3.0).empty            # flat market: ATR 0 < 3 x 0.30
+    assert len(run(rows, min_atr_spread=0.0)) == 1
+
+
+def test_session_breakout_only_in_window_and_once_per_day():
+    idx = pd.date_range("2026-01-05 00:00", "2026-01-05 12:00", freq="1min", inclusive="left")
+    c = pd.Series(2650.0, index=idx)
+    c[(idx.hour >= 7)] = 2655.0        # breaks the 00-07 range high at 07:00 and stays above
+    bars = pd.DataFrame({"open": c, "high": c + 0.1, "low": c - 0.1, "close": c})
+    sig = signals.london_breakout(bars)
+    assert sig.sum() == 1 and sig[sig != 0].index[0] == pd.Timestamp("2026-01-05 07:00")

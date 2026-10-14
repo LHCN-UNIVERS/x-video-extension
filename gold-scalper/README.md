@@ -9,8 +9,10 @@ so they still work if your PC or the script stops.
 | `config.py` | **All settings** (lot, TP, SL, signal, spread filter, hours, daily loss limit, dry-run) |
 | `fetch_mt5_data.py` | Downloads real bid/ask ticks from your broker → `ticks.csv` |
 | `backtest.py` | Replays those ticks and shows whether the rules would have made money |
+| `fetch_mt5_bars.py` | Downloads years of daily + 4-hour bars and your broker's swap → `bars_D1.csv`, `bars_H4.csv` |
+| `trend_backtest.py` | Trend-following test (hold days/weeks) on those bars, vs. buy & hold |
 | `live_bot.py` | Trades automatically in MT5 using the same rules |
-| `signals.py` | Entry signals: `ema_pullback`, `breakout`, `rsi_reversion`, `coin_flip` (baseline) |
+| `signals.py` | Entry signals: `ema_pullback`, `breakout`, `rsi_reversion`, `london_breakout`, `ny_breakout`, `coin_flip` (baseline) |
 | `make_synthetic_ticks.py` | Fake data, only for checking that the code runs |
 
 ## Why the spread matters so much
@@ -54,9 +56,39 @@ is what this tool showed when tested. A signal is only worth trading if it clear
    **demo** account for a few weeks. Compare demo results with the backtest.
 7. Only then, if results hold up: `ALLOW_REAL_ACCOUNT = True`, smallest lot (0.01).
 
+## Step A: scalper with time, volatility and trailing-stop options
+
+```
+python backtest.py ticks.csv --sweep --split 0.7
+```
+Tries 6 signals x 5 exit styles (fixed targets and trailing stops) x volatility filter on/off,
+then shows the top 3 on the unseen 30%, each with a **by-hour** table. Combinations with fewer
+than 15 trades are not ranked. Single tests, e.g.:
+```
+python backtest.py ticks.csv --signal london_breakout --tp 0 --trail 3 --sl 5 --hold 480
+```
+London/NY breakout hours are broker **server** hours (GMT on Exness). They trade at most once a
+day, so they need many days of ticks to judge: download more with `fetch_mt5_data.py --days 120`
+if your disk has room (60 days of ticks ~ 0.5 GB).
+
+## Step B: trend following on years of data
+
+```
+python fetch_mt5_bars.py
+python trend_backtest.py bars_D1.csv
+python trend_backtest.py bars_H4.csv
+```
+Tests Donchian breakout, moving average and momentum rules, long-only and long+short, with and
+without an ATR stop. Includes spread and your broker's real overnight swap. Every result is
+compared with plain **buy & hold** over the same period: a trend rule that can't beat holding
+gold with less drawdown isn't worth running. Trust a setup only if it works on the unseen 30%
+on **both** D1 and H4. (There is no live bot for this yet; it trades rarely enough to do by hand
+or we add one if the test is convincing.)
+
 ## Built-in safety
 
-- Stop loss on every trade; optional time exit (`MAX_HOLD_MINUTES`)
+- Stop loss on every trade; optional trailing stop (`TRAIL_DIST`) and time exit (`MAX_HOLD_MINUTES`)
+- Optional volatility filter (`MIN_ATR_SPREAD`): skips entries when the market is too quiet
 - One trade at a time; at most one decision per completed 1-minute bar
 - Skips entries when the spread is too wide (news) or outside `TRADE_HOURS`
 - `MAX_TRADES_PER_DAY` and `DAILY_LOSS_LIMIT` stop the bot for the day

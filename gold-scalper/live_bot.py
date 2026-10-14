@@ -49,7 +49,7 @@ class Bot:
                         m.ORDER_FILLING_FOK if info.filling_mode & FILLING_FOK else
                         m.ORDER_FILLING_RETURN)
         min_stop = info.trade_stops_level * info.point
-        if config.TP_DIST < min_stop:
+        if config.TP_DIST and config.TP_DIST < min_stop:
             raise SystemExit(f"Broker minimum stop distance is {min_stop:.2f}; "
                              f"TP_DIST={config.TP_DIST} is too close. This broker can't do +0.50 TPs.")
         if info.volume_min > config.LOT:
@@ -67,6 +67,7 @@ class Bot:
             return
         now = datetime.fromtimestamp(tick.time, timezone.utc)   # broker server time
         self.close_stale_positions(tick, now)
+        self.trail_stops(tick)
 
         rates = m.copy_rates_from_pos(config.SYMBOL, m.TIMEFRAME_M1, 0, 300)
         if rates is None or len(rates) < 60:
@@ -76,25 +77,30 @@ class Bot:
         if bar_time == self.last_bar:
             return
         self.last_bar = bar_time
+        bars.index = pd.to_datetime(bars["time"], unit="s")   # server time, like the backtest
+        bars = bars[["open", "high", "low", "close"]]
 
-        sig = signals.compute(config.SIGNAL, bars[["open", "high", "low", "close"]],
-                              config.SIGNAL_PARAMS.get(config.SIGNAL, {}))
+        sig = signals.compute(config.SIGNAL, bars, config.SIGNAL_PARAMS.get(config.SIGNAL, {}))
         direction = int(sig.iloc[-1])
         if direction == 0:
             return
         side = "BUY" if direction > 0 else "SELL"
-        reason = self.blocked(tick, now)
+        reason = self.blocked(tick, now, bars)
         if reason:
             log.info("%s signal skipped: %s", side, reason)
             return
         self.open_trade(direction, tick)
 
-    def blocked(self, tick, now):
+    def blocked(self, tick, now, bars):
         if self.my_positions():
             return "a trade is already open"
         spread = tick.ask - tick.bid
         if spread > config.MAX_SPREAD:
             return f"spread {spread:.2f} > {config.MAX_SPREAD}"
+        if config.MIN_ATR_SPREAD:
+            a = signals.atr(bars).iloc[-1]
+            if not a >= config.MIN_ATR_SPREAD * spread:
+                return f"market too quiet (ATR {a:.2f} < {config.MIN_ATR_SPREAD:g} x spread)"
         if now.hour not in config.TRADE_HOURS:
             return f"outside trading hours (server hour {now.hour})"
         trades, pnl = self.today_stats(now)
@@ -143,6 +149,29 @@ class Bot:
             if res is not None and res.retcode == m.TRADE_RETCODE_DONE:
                 log.info("Adjusted stops to fill %.2f -> TP %.2f SL %.2f", p.price_open, tp, sl)
 
+    def trail_stops(self, tick):
+        """Move the stop loss behind price; it never moves back."""
+        if not config.TRAIL_DIST:
+            return
+        m = self.mt5
+        for p in self.my_positions():
+            long_ = p.type == m.POSITION_TYPE_BUY
+            if long_:
+                new_sl = round(tick.bid - config.TRAIL_DIST, self.digits)
+                better = new_sl > p.sl + self.point / 2
+            else:
+                new_sl = round(tick.ask + config.TRAIL_DIST, self.digits)
+                better = p.sl == 0 or new_sl < p.sl - self.point / 2
+            if not better:
+                continue
+            if config.DRY_RUN:
+                log.info("[DRY RUN] would trail SL of %s to %.2f", p.ticket, new_sl)
+                continue
+            res = m.order_send({"action": m.TRADE_ACTION_SLTP, "symbol": config.SYMBOL,
+                                "position": p.ticket, "sl": new_sl, "tp": p.tp, "magic": config.MAGIC})
+            if res is not None and res.retcode == m.TRADE_RETCODE_DONE:
+                log.info("Trailed SL of %s to %.2f", p.ticket, new_sl)
+
     def close_stale_positions(self, tick, now):
         if not config.MAX_HOLD_MINUTES:
             return
@@ -168,6 +197,8 @@ class Bot:
     def levels(self, price, buy):
         tp = price + config.TP_DIST if buy else price - config.TP_DIST
         sl = price - config.SL_DIST if buy else price + config.SL_DIST
+        if not config.TP_DIST:
+            tp = 0.0                      # 0 = no take profit in MT5
         return round(tp, self.digits), round(sl, self.digits)
 
     def my_positions(self):

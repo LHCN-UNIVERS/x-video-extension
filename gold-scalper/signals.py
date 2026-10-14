@@ -47,6 +47,44 @@ def rsi_reversion(bars, period=14, low=30, high=70):
     return _combine(buy, sell, bars.index, warmup=period + 1)
 
 
+def session_breakout(bars, range_start=0, range_end=7, trade_until=10):
+    """Opening-range breakout (the idea behind the repo's London Breakout).
+
+    Builds the high/low of each day between `range_start` and `range_end`
+    (broker server hours), then takes the FIRST close outside that range
+    between `range_end` and `trade_until`. One signal per day at most.
+    """
+    idx = pd.DatetimeIndex(bars.index)
+    day, hour = idx.normalize(), idx.hour
+    in_range = pd.Series((hour >= range_start) & (hour < range_end), index=bars.index)
+    in_trade = pd.Series((hour >= range_end) & (hour < trade_until), index=bars.index)
+    hi = bars["high"].where(in_range).groupby(day).cummax().groupby(day).ffill()
+    lo = bars["low"].where(in_range).groupby(day).cummin().groupby(day).ffill()
+    c = bars["close"]
+    buy = in_trade & (c > hi)
+    sell = in_trade & (c < lo)
+    first = (buy | sell).astype(int).groupby(day).cumsum() == 1
+    return _combine(buy & first, sell & first, bars.index, warmup=0)
+
+
+def london_breakout(bars):
+    """Range = Asian session 00:00-07:00, trade the London open 07:00-10:00 (server time)."""
+    return session_breakout(bars, 0, 7, 10)
+
+
+def ny_breakout(bars):
+    """Range = 10:00-13:00, trade the US data / New York open 13:00-16:00 (server time)."""
+    return session_breakout(bars, 10, 13, 16)
+
+
+def atr(bars, period=14):
+    """Average true range in $, per bar."""
+    prev = bars["close"].shift(1)
+    tr = pd.concat([bars["high"] - bars["low"], (bars["high"] - prev).abs(),
+                    (bars["low"] - prev).abs()], axis=1).max(axis=1)
+    return tr.rolling(period).mean()
+
+
 def coin_flip(bars):
     """Baseline with no edge: buy after an up bar, sell after a down bar, every bar.
     Any real signal has to beat this."""
@@ -66,6 +104,8 @@ SIGNALS = {
     "ema_pullback": ema_pullback,
     "breakout": breakout,
     "rsi_reversion": rsi_reversion,
+    "london_breakout": london_breakout,
+    "ny_breakout": ny_breakout,
     "coin_flip": coin_flip,
 }
 

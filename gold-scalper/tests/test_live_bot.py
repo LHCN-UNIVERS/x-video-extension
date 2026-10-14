@@ -15,7 +15,7 @@ import fake_mt5 as mt5
 def bot(monkeypatch):
     mt5.reset()
     mt5.state.trade_mode = mt5.ACCOUNT_TRADE_MODE_DEMO
-    mt5.state.spread, mt5.state.slip = 0.25, 0.0
+    mt5.state.spread, mt5.state.slip, mt5.state.bid = 0.25, 0.0, 2650.0
     monkeypatch.setattr(config, "DRY_RUN", False)
     monkeypatch.setattr(config, "TRADE_HOURS", range(24))
     monkeypatch.setattr(signals, "compute",
@@ -75,3 +75,14 @@ def test_time_exit_closes_old_position(bot, monkeypatch):
     monkeypatch.setattr(signals, "compute", lambda *a, **k: pd.Series([0, 0]))
     bot.step()
     assert mt5.state.positions == []
+
+
+def test_trailing_stop_moves_sl_up(bot, monkeypatch):
+    monkeypatch.setattr(config, "TRAIL_DIST", 1.0)
+    bot.step()
+    mt5.state.bid = 2652.0
+    bot.step()
+    assert mt5.state.positions[0].sl == pytest.approx(2651.0)
+    mt5.state.bid = 2651.5                                    # price falls back: stop must not move down
+    bot.step()
+    assert mt5.state.positions[0].sl == pytest.approx(2651.0)
