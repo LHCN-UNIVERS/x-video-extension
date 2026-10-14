@@ -175,3 +175,13 @@ def test_ignores_other_symbols(env):
     p.symbol = "EURUSDm"
     g.step()
     assert m.requests == []
+
+
+def test_dry_run_logs_each_action_once(env, monkeypatch, caplog):
+    m, g = env
+    monkeypatch.setattr(config, "GUARD_DRY_RUN", True)
+    m.open("BUY", 4000.3)
+    with caplog.at_level("INFO", logger="guard"):
+        for _ in range(5):
+            g.step()
+    assert sum("would add SL" in r.message for r in caplog.records) == 1

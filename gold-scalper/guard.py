@@ -34,6 +34,8 @@ class Guard:
         self.info = {}
         self.last_try = {}
         self.locked_day = None
+        self.dry_seen = set()
+        self.last_status = 0.0
 
     # ------------------------------------------------------------------ setup
     def start(self):
@@ -76,6 +78,11 @@ class Guard:
         now = server_dt(tick.time)
         today = now.date()
         opened_today, day_pnl = self.today(now, positions)
+        if time.time() - self.last_status >= 60:
+            self.last_status = time.time()
+            log.info("Status: %d gold trade(s) open, %d opened today, today's result %.2f%s",
+                     len(positions), len(opened_today), day_pnl,
+                     "  [daily loss limit reached]" if self.locked_day == today else "")
 
         if config.GUARD_DAILY_LOSS_LIMIT and day_pnl <= -config.GUARD_DAILY_LOSS_LIMIT:
             if self.locked_day != today:
@@ -175,7 +182,9 @@ class Guard:
             return
         self.last_try[key] = time.time()
         if config.GUARD_DRY_RUN:
-            log.info("[DRY RUN] ticket %s %s: would %s", p.ticket, p.symbol, text)
+            if (p.ticket, text) not in self.dry_seen:          # say each thing once, not every 10 s
+                self.dry_seen.add((p.ticket, text))
+                log.info("[DRY RUN] ticket %s %s: would %s", p.ticket, p.symbol, text)
             return
         res = self.mt5.order_send(req)
         if res is not None and res.retcode == self.mt5.TRADE_RETCODE_DONE:
