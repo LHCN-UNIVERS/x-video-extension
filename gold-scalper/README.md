@@ -80,7 +80,9 @@ All numbers are `GUARD_*` settings in `config.py`. It starts with `GUARD_DRY_RUN
    "Windows App" / "Remote Desktop" app) using the IP, user and password the provider sends.
 3. On the VPS: install MT5 from your broker, log in to your account (tick "Save password"),
    and turn **Algo Trading** on (green).
-4. Install Python 3.12 (tick "Add python.exe to PATH"), then in `cmd`: `pip install MetaTrader5 pandas numpy`
+4. Install **Python 3.12, 64-bit** (tick "Add python.exe to PATH"), then in a new `cmd`:
+   `py -3.12 -m pip install MetaTrader5 pandas numpy`. If pip says "No matching distribution found
+   for MetaTrader5", your Python is too new or 32-bit: install 3.12 64-bit and use `py -3.12`.
 5. Download this folder (GitHub > Code > Download ZIP) and unzip it on the VPS.
 6. Double-click **`start_guard.bat`**. Leave the window open.
 7. To leave: just **close the Remote Desktop window** (do NOT "Sign out" - that stops everything).
