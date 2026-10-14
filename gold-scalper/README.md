@@ -13,6 +13,8 @@ so they still work if your PC or the script stops.
 | `m1_backtest.py` | Intraday signals tested on years of 1-minute bars |
 | `trend_backtest.py` | Trend-following test (hold days/weeks) on those bars, vs. buy & hold |
 | `analyze_my_trades.py` | Reads YOUR past trades from MT5 history (read-only) and shows what makes/loses money |
+| `guard.py` | Trading guard: protects your manual trades (SL, trailing stop, lot limit, daily loss limit) |
+| `start_guard.bat` | Starts the guard and restarts it if it stops (for the VPS) |
 | `live_bot.py` | Trades automatically in MT5 using the same rules |
 | `signals.py` | Entry signals: `ema_pullback`, `breakout`, `rsi_reversion`, `london_breakout`, `ny_breakout`, `coin_flip` (baseline) |
 | `make_synthetic_ticks.py` | Fake data, only for checking that the code runs |
@@ -57,6 +59,35 @@ is what this tool showed when tested. A signal is only worth trading if it clear
 6. After a day or two of sensible dry-run logs, set `DRY_RUN = False` and let it trade the
    **demo** account for a few weeks. Compare demo results with the backtest.
 7. Only then, if results hold up: `ALLOW_REAL_ACCOUNT = True`, smallest lot (0.01).
+
+## Trading guard (protects your manual trades, also from the phone app)
+
+`guard.py` never opens trades. Every second it checks your open gold positions and:
+- adds a **stop loss** ($3) to any trade without one (and a take profit if `GUARD_TP_DIST` > 0)
+- **trails** the stop $2 behind price once the trade is +$1 in profit; it never moves back
+- cuts trades bigger than **0.01 lot** down to 0.01
+- closes trades opened in **blocked hours** (0:00-2:59 server time)
+- closes trades after the **10th of the day**
+- at **-$20 for the day** (closed + open) closes everything until the next server day
+
+All numbers are `GUARD_*` settings in `config.py`. It starts with `GUARD_DRY_RUN = True`
+(only logs to the screen and `guard.log`). Set it to `False` when the log looks right.
+
+### Running it 24/7 on a Windows VPS
+1. Rent a **Windows** VPS (1-2 GB RAM is enough). Ask your broker first: Exness and others offer
+   a free VPS if you meet their conditions. Choose a location close to your broker's servers.
+2. Connect with **Remote Desktop** (Windows: "Remote Desktop Connection"; phone: the
+   "Windows App" / "Remote Desktop" app) using the IP, user and password the provider sends.
+3. On the VPS: install MT5 from your broker, log in to your account (tick "Save password"),
+   and turn **Algo Trading** on (green).
+4. Install Python 3.12 (tick "Add python.exe to PATH"), then in `cmd`: `pip install MetaTrader5 pandas numpy`
+5. Download this folder (GitHub > Code > Download ZIP) and unzip it on the VPS.
+6. Double-click **`start_guard.bat`**. Leave the window open.
+7. To leave: just **close the Remote Desktop window** (do NOT "Sign out" - that stops everything).
+8. Auto-start after a VPS restart: press Win+R, type `shell:startup`, Enter, and put shortcuts to
+   **MT5** and **start_guard.bat** in that folder.
+
+Now trade from your phone as usual: the guard on the VPS sees every trade on the account.
 
 ## Analyse your own manual trading
 

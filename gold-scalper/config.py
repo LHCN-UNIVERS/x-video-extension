@@ -44,3 +44,16 @@ DRY_RUN = True               # True = log what it WOULD do, send no orders
 ALLOW_REAL_ACCOUNT = False   # bot refuses to run on a real-money account unless True
 MAGIC = 50050                # id stamped on the bot's orders
 DEVIATION_POINTS = 30        # max slippage accepted when opening
+
+# --- Trading guard (guard.py): protects your MANUAL trades, e.g. from the phone app -------
+GUARD_DRY_RUN = True            # True = only log what it WOULD do. Set False to let it act.
+GUARD_SYMBOL_MATCH = "XAU"      # guard positions whose symbol contains this (gold)
+GUARD_SL_DIST = 3.0             # add a stop loss $3 from entry to any trade without one (0 = off)
+GUARD_TP_DIST = 0.0             # add a take profit this far from entry if none (0 = off)
+GUARD_TRAIL_DIST = 2.0          # trailing stop: keep the stop $2 behind the best price (0 = off)
+GUARD_TRAIL_START = 1.0         # ...but only once the trade is at least +$1 in profit
+GUARD_MAX_LOT = 0.01            # bigger trades are cut down to this size (0 = off)
+GUARD_BLOCKED_HOURS = [0, 1, 2] # server hours: trades opened in these hours are closed
+GUARD_MAX_TRADES_PER_DAY = 10   # trades opened after the 10th of the day are closed (0 = off)
+GUARD_DAILY_LOSS_LIMIT = 20.0   # at -$20 for the day (closed + open), close everything and
+                                # close any new trade until the next server day (0 = off)
