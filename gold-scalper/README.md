@@ -12,6 +12,7 @@ so they still work if your PC or the script stops.
 | `fetch_mt5_bars.py` | Downloads years of daily + 4-hour bars and your broker's swap → `bars_D1.csv`, `bars_H4.csv` |
 | `m1_backtest.py` | Intraday signals tested on years of 1-minute bars |
 | `trend_backtest.py` | Trend-following test (hold days/weeks) on those bars, vs. buy & hold |
+| `analyze_my_trades.py` | Reads YOUR past trades from MT5 history (read-only) and shows what makes/loses money |
 | `live_bot.py` | Trades automatically in MT5 using the same rules |
 | `signals.py` | Entry signals: `ema_pullback`, `breakout`, `rsi_reversion`, `london_breakout`, `ny_breakout`, `coin_flip` (baseline) |
 | `make_synthetic_ticks.py` | Fake data, only for checking that the code runs |
@@ -56,6 +57,15 @@ is what this tool showed when tested. A signal is only worth trading if it clear
 6. After a day or two of sensible dry-run logs, set `DRY_RUN = False` and let it trade the
    **demo** account for a few weeks. Compare demo results with the backtest.
 7. Only then, if results hold up: `ALLOW_REAL_ACCOUNT = True`, smallest lot (0.01).
+
+## Analyse your own manual trading
+
+Log in to the account you trade on, then:
+```
+python analyze_my_trades.py --days 365
+```
+Shows your real net result after costs, plus results by hour, hold time, side, weekday and month.
+It only reads history; it never places or changes orders.
 
 ## Step A: scalper with time, volatility and trailing-stop options
 

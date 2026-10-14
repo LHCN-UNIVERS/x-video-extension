@@ -4,3 +4,4 @@ synthetic_ticks*
 trades*.csv
 bot.log
 __pycache__/
+my_trades.csv
