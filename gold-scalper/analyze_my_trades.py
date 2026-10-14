@@ -69,7 +69,7 @@ def summary(df):
 
 
 def group_table(df, key, order=None):
-    g = df.groupby(key)
+    g = df.groupby(key, observed=False)
     t = pd.DataFrame({"trades": g.size(), "win_rate": g.net.apply(lambda x: (x > 0).mean()),
                       "net": g.net.sum(), "net_per_0.01lot": g.net_per_001.sum()})
     if order is not None:
