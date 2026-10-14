@@ -10,6 +10,7 @@ so they still work if your PC or the script stops.
 | `fetch_mt5_data.py` | Downloads real bid/ask ticks from your broker → `ticks.csv` |
 | `backtest.py` | Replays those ticks and shows whether the rules would have made money |
 | `fetch_mt5_bars.py` | Downloads years of daily + 4-hour bars and your broker's swap → `bars_D1.csv`, `bars_H4.csv` |
+| `m1_backtest.py` | Intraday signals tested on years of 1-minute bars |
 | `trend_backtest.py` | Trend-following test (hold days/weeks) on those bars, vs. buy & hold |
 | `live_bot.py` | Trades automatically in MT5 using the same rules |
 | `signals.py` | Entry signals: `ema_pullback`, `breakout`, `rsi_reversion`, `london_breakout`, `ny_breakout`, `coin_flip` (baseline) |
@@ -84,6 +85,16 @@ compared with plain **buy & hold** over the same period: a trend rule that can't
 gold with less drawdown isn't worth running. Trust a setup only if it works on the unseen 30%
 on **both** D1 and H4. (There is no live bot for this yet; it trades rarely enough to do by hand
 or we add one if the test is convincing.)
+
+## Years of 1-minute bars (more trades for the intraday signals)
+
+In MT5 set Tools > Options > Charts > "Max. bars in chart" to Unlimited and restart MT5, then:
+```
+python fetch_mt5_bars.py --m1 --years 5
+python m1_backtest.py bars_M1.csv
+```
+Same signals and exits as `backtest.py`, simulated on 1-minute bars with conservative fills
+(stop assumed first when a bar touches both stop and target). Shows results by year and hour.
 
 ## Built-in safety
 

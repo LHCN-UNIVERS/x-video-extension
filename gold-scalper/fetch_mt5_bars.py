@@ -2,6 +2,10 @@
 
   python fetch_mt5_bars.py                 -> bars_D1.csv and bars_H4.csv (10 years if available)
   python fetch_mt5_bars.py --years 5
+  python fetch_mt5_bars.py --m1 --years 5  -> bars_M1.csv (1-minute bars, ~60 MB per year)
+
+For --m1: in MT5 set Tools > Options > Charts > "Max. bars in chart" to Unlimited and restart
+MT5, otherwise only the last ~100,000 minutes (about 3 months) are available.
 
 Tip: if you get few bars, open a D1 and an H4 gold chart in MT5 and press Home a few times
 to scroll back, so the terminal downloads more history, then run this again.
@@ -20,6 +24,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--years", type=int, default=10)
     ap.add_argument("--symbol", default=config.SYMBOL)
+    ap.add_argument("--m1", action="store_true", help="download 1-minute bars instead of D1/H4")
     a = ap.parse_args()
 
     if not mt5.initialize():
@@ -41,6 +46,10 @@ def main():
 
     end = datetime.now(timezone.utc) + timedelta(days=1)
     start = end - timedelta(days=365 * a.years)
+    if a.m1:
+        fetch_m1(a.symbol, info, start, end)
+        mt5.shutdown()
+        return
     for name, tf in (("D1", mt5.TIMEFRAME_D1), ("H4", mt5.TIMEFRAME_H4)):
         rates = mt5.copy_rates_range(a.symbol, tf, start, end)
         if rates is None or not len(rates):
@@ -53,6 +62,27 @@ def main():
         print(f"{name}: {len(df):,} bars  {df.time.iloc[0]:%Y-%m-%d} -> {df.time.iloc[-1]:%Y-%m-%d}"
               f"  -> bars_{name}.csv")
     mt5.shutdown()
+
+
+def fetch_m1(symbol, info, start, end, out="bars_M1.csv"):
+    """1-minute bars, one month per request (MT5 refuses very large single requests)."""
+    parts, t = [], start
+    while t < end:
+        nxt = min(t + timedelta(days=31), end)
+        rates = mt5.copy_rates_range(symbol, mt5.TIMEFRAME_M1, t, nxt)
+        if rates is not None and len(rates):
+            df = pd.DataFrame(rates)
+            parts.append(df)
+            print(f"{t:%Y-%m}: {len(df):,} bars", flush=True)
+        t = nxt
+    if not parts:
+        raise SystemExit("No M1 bars returned. Set 'Max. bars in chart' to Unlimited, restart MT5, "
+                         "open an M1 gold chart and press Home a few times, then retry.")
+    df = pd.concat(parts, ignore_index=True).drop_duplicates("time").sort_values("time")
+    df["time"] = pd.to_datetime(df["time"], unit="s")
+    df["spread_usd"] = df["spread"] * info.point
+    df[["time", "open", "high", "low", "close", "spread_usd"]].to_csv(out, index=False)
+    print(f"M1: {len(df):,} bars  {df.time.iloc[0]:%Y-%m-%d} -> {df.time.iloc[-1]:%Y-%m-%d}  -> {out}")
 
 
 def swap_per_lot_usd(info):
